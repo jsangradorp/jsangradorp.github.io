@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Transform Data on the Fly With Java Nashorn | The Coal Mine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="We were asked to migrate data back and forth between two schema-incompatible systems. At the same time, their schemas were evolving. We decided not to waste our">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Transform Data on the Fly With Java Nashorn">
+<meta property="og:url" content="http://blog.yokiyoki.com/2017/11/30/Transform-data-on-the-fly-with-Java-Nashorn/index.html">
+<meta property="og:site_name" content="The Coal Mine">
+<meta property="og:description" content="We were asked to migrate data back and forth between two schema-incompatible systems. At the same time, their schemas were evolving. We decided not to waste our developer energy on writing disposable">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://blog.yokiyoki.com/images/migration-is-not-a-crime.png">
+<meta property="og:image" content="http://blog.yokiyoki.com/images/javascript-document-icon.png">
+<meta property="og:image" content="http://blog.yokiyoki.com/images/rhinoceros.png">
+<meta property="og:updated_time" content="2017-11-30T16:22:17.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Transform Data on the Fly With Java Nashorn">
+<meta name="twitter:description" content="We were asked to migrate data back and forth between two schema-incompatible systems. At the same time, their schemas were evolving. We decided not to waste our developer energy on writing disposable">
+<meta name="twitter:image" content="http://blog.yokiyoki.com/images/migration-is-not-a-crime.png">
+  
+    <link rel="alternate" href="/atom.xml" title="The Coal Mine" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+
+</head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">The Coal Mine</a>
+      </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle">a technology worker&#39;s experiences from the galleries</a>
+        </h2>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://blog.yokiyoki.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-Transform-data-on-the-fly-with-Java-Nashorn" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2017/11/30/Transform-data-on-the-fly-with-Java-Nashorn/" class="article-date">
+  <time datetime="2017-11-30T10:46:45.000Z" itemprop="datePublished">2017-11-30</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Transform Data on the Fly With Java Nashorn
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>We were asked to migrate data back and forth between two schema-incompatible
+systems. At the same time, their schemas were evolving. We decided not to
+waste our developer energy on writing disposable mapping tables in Excel.
+Instead, we provided our product colleagues with the tools to transform data
+themselves in a more efficient way. And we used
+<a href="http://openjdk.java.net/projects/nashorn/" target="_blank" rel="noopener">Java Nashorn</a> to do it.</p>
+<a id="more"></a>
+<h2 id="AN-OLD-PROBLEM"><a href="#AN-OLD-PROBLEM" class="headerlink" title="AN OLD PROBLEM"></a>AN OLD PROBLEM</h2><figure style="width: 25%; float: left"><img src="/images/migration-is-not-a-crime.png" alt="Paddington bear: migration is not a crime">
+</figure>
+
+<p>We’ve all faced this challenge many times: migrate an old system to a new one.
+Keep <em>all</em> the data and adapt it to the new schemas, and on top of that provide
+interoperability. At Schibsted, we’ve had many cases where we have upgraded
+the technology for our classified ad websites, and then we have had to ensure
+we keep our existing user base and content data.</p>
+<p>We poor developers lose sleep over these operations! Often we create <em>ad hoc</em>
+scripts:</p>
+<p><code>mix_fields_together</code>, <code>extract_some_info_from_them</code>,
+<code>call_third_parties_to_fill_in_the_gaps</code>,
+<code>optimize_so_migration_doesn_t_take_ages</code>, and so on <em>ad nauseam</em>.</p>
+<p>And worst of all, when we get the result of the script,  often someone will
+realize that something has to be changed, e.g. we were missing fields or had a
+mistaken preconception.</p>
+<p>Start again. Edit script. Run migration. Show result. More changes.</p>
+<blockquote>
+<p>Sound familiar?</p>
+</blockquote>
+<h2 id="ROOM-FOR-IMPROVEMENT"><a href="#ROOM-FOR-IMPROVEMENT" class="headerlink" title="ROOM FOR IMPROVEMENT"></a>ROOM FOR IMPROVEMENT</h2><p>This time we had to do it better. We wanted to make it so anyone in the team
+could do the debugging, and also make it a nicer task, so everyone would be
+able to continue working on adding value.</p>
+<p>Hopefully, we would also find a <em>better</em> solution to the problem at hand than
+our many previous attempts. So what could we do?</p>
+<p>Experience has shown that most data transformations are simple mappings that
+can be managed on Excel worksheets. <strong>We will support this</strong>.</p>
+<p>The same experience shows that a small but nasty number of those
+transformations require more complex formulas for adding, subtracting,
+combining or other manipulation of the original data. <strong>We will also manage
+this</strong>.</p>
+<p>So in summary, these came to be the requirements:</p>
+<ul>
+<li>Whoever deals with the migration can manage the mapping tables and the rules
+to mix, remove, extract and everything else on data fields.</li>
+<li>It shouldn’t be a painful process.</li>
+<li>Oh, and some other minor stuff like reliability and performance…</li>
+</ul>
+<h2 id="CHOICES-WE-MADE"><a href="#CHOICES-WE-MADE" class="headerlink" title="CHOICES WE MADE"></a>CHOICES WE MADE</h2><figure style="width: 25%; float: left"><img src="/images/javascript-document-icon.png" alt="Javascript document icon">
+</figure>
+
+<p>So, we wanted to let users upload their Excel mapping tables, and also let
+them define how to <em>compose</em> their destination field definitions based on those
+tables.</p>
+<p>That called for giving users a language capable of expressions, and also a
+place to drop those definitions.</p>
+<p>[Let me divert for a second to state that we had decided to use Scala for the
+project implementation, for reasons that would require a separate post to
+explain!]</p>
+<p>We settled on providing a service to upload the tables and the field
+definitions. The <em>language</em> we would provide to write the definitions was the
+next big ugly monster -– I mean <em>interesting problem</em>! -– we faced.</p>
+<blockquote>
+<p>We don’t want to implement a language. What if we use something already
+existing? Let us find out if and what interpreters are available. How cool is
+that? Java includes a Javascript interpreter and anything Java is Scala too!</p>
+</blockquote>
+<h2 id="ENTER-NASHORN"><a href="#ENTER-NASHORN" class="headerlink" title="ENTER NASHORN"></a>ENTER NASHORN</h2><figure style="width: 25%; float: left"><img src="/images/rhinoceros.png" alt="Nashorn as tool to transform data">
+</figure>
+
+<p>It turns out that
+<a href="http://docs.oracle.com/javase/8/docs/technotes/guides/scripting/enhancements.html#jdk8" target="_blank" rel="noopener">Java 8</a>
+comes with a first class ECMA-compliant Javascript
+engine out of the box. Its name is Nashorn (German for rhinoceros) and we
+decided to try and see what it could do for us. Javascript is an easy language
+to use at this level, and we knew many non-technical people were already
+familiar with it, if only to do some basic magic on web page prototypes and
+such.</p>
+<p>Besides, this programming language had the added advantage of being 
+<a href="https://stackoverflow.com/questions/9154388/does-untyped-also-mean-dynamically-typed-in-the-academic-cs-world" target="_blank" rel="noopener">“untyped”</a>:
+for a job like this where the user might end up doing crazy things with data
+of unknown types, it looked like a perfect fit!</p>
+<p>Javascript then.</p>
+<h2 id="BACK-TO-THE-TASK"><a href="#BACK-TO-THE-TASK" class="headerlink" title="BACK TO THE TASK"></a>BACK TO THE TASK</h2><p><em>Or, the most code-oriented part of the post</em></p>
+<h2 id="THE-JAVASCRIPT-ENGINE"><a href="#THE-JAVASCRIPT-ENGINE" class="headerlink" title="THE JAVASCRIPT ENGINE"></a>THE JAVASCRIPT ENGINE</h2><p>We needed a Javascript interpreter in our Scala code. For that we used the
+simple instantiation code:</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Scala</span></span><br><span class="line"> </span><br><span class="line"><span class="keyword">import</span> javax.script.<span class="type">ScriptEngine</span></span><br><span class="line"><span class="keyword">import</span> jdk.nashorn.api.scripting.<span class="type">NashornScriptEngineFactory</span></span><br><span class="line"> </span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Transformer</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">lazy</span> <span class="keyword">val</span> engine: <span class="type">ScriptEngine</span> = initEngine()</span><br><span class="line"> </span><br><span class="line">  <span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">initEngine</span></span>(): <span class="type">ScriptEngine</span> = &#123;</span><br><span class="line">    <span class="keyword">val</span> engine = <span class="keyword">new</span> <span class="type">NashornScriptEngineFactory</span>().getScriptEngine()</span><br><span class="line">    engine</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="THE-TRANSFORMATION-RULES"><a href="#THE-TRANSFORMATION-RULES" class="headerlink" title="THE TRANSFORMATION RULES"></a>THE TRANSFORMATION RULES</h2><p>In order to migrate data schemas, you need to define a set of output fields
+derived from a set of input fields and mapping tables. Some simple examples:</p>
+<ul>
+<li>OutputField1 ←  input field x</li>
+<li>OutputField2 ←  input field x concatenated to input field y</li>
+<li>OutputField3 ←  first three characters of input field z</li>
+<li>OutputField4 ←  mapping in table “categories” corresponding to input fields v and w</li>
+</ul>
+<p>And so on.</p>
+<p>We ask the operator to write a <a href="http://yaml.org/" target="_blank" rel="noopener">YAML</a> file with one field
+per output field, whose value is the javascript code to calculate it. Our
+system will read it and later run it for each of the output fields:</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># YAML</span></span><br><span class="line"> </span><br><span class="line"><span class="attr">- "output_field_1_name":</span> <span class="string">input.x;</span></span><br><span class="line"><span class="attr">- "output_field_2_name":</span> <span class="string">input.x</span> <span class="string">+</span> <span class="string">input.y;</span></span><br><span class="line"><span class="attr">- "output_field_3_name":</span> <span class="string">input.z.substr(0,</span> <span class="number">3</span><span class="string">);</span></span><br><span class="line"><span class="attr">- "output_field_4_name":</span> <span class="string">map('categories',</span> <span class="string">['v',</span> <span class="string">'w'</span><span class="string">],</span> <span class="string">[input.v,</span> <span class="string">input.w]).category;</span></span><br></pre></td></tr></table></figure>
+<p>As you can guess from the above, we provide bound variables with the full
+<a href="http://www.json.org/" target="_blank" rel="noopener">JSON</a> input object plus lookup tables (Javascript
+arrays) copied from the good old Excel sheets, so you can compose and look up
+in order to define your output fields.</p>
+<p>It turns out you can bind Javascript variables to the runtime environment
+where you execute your Javascript code, like this:</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Scala</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> javax.script.<span class="type">Bindings</span></span><br><span class="line"><span class="keyword">import</span> org.json4s.<span class="type">JNothing</span></span><br><span class="line"><span class="keyword">import</span> org.json4s.<span class="type">JValue</span></span><br><span class="line"><span class="keyword">import</span> org.json4s.jackson.<span class="type">JsonMethods</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">putValueInBindings</span></span>(bindings: <span class="type">Bindings</span>, name: <span class="type">String</span>, value: <span class="type">JValue</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    <span class="keyword">val</span> jsonStr: <span class="type">String</span> = value <span class="keyword">match</span> &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="type">JNothing</span> =&gt; <span class="string">"&#123;&#125;"</span></span><br><span class="line">      <span class="keyword">case</span> _ =&gt; <span class="type">JsonMethods</span>.compact(<span class="type">JsonMethods</span>.render(value))</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    bindings.put(name, jsonStr)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Of course, the <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/scripting/prog_guide/api.html" target="_blank" rel="noopener">magic is in
+bindings</a>.
+We have previously obtained the bindings object from Nashorn in initEngine
+with (not shown above for clarity):</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Scala</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">val</span> bindings: <span class="type">Bindings</span> = engine.getBindings(<span class="type">ScriptContext</span>.<span class="type">ENGINE_SCOPE</span>)</span><br></pre></td></tr></table></figure>
+<h2 id="THE-SCHEMA-TRANSFORMATION"><a href="#THE-SCHEMA-TRANSFORMATION" class="headerlink" title="THE SCHEMA TRANSFORMATION"></a>THE SCHEMA TRANSFORMATION</h2><p>The last step in the process is to actually apply the transformation
+definitions to the input. We did that in the transform method, actually asking
+Nashorn to run Javascript code: a transform global function that we also bound
+in a separate step.</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Scala</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">transform</span></span>(data: <span class="type">JValue</span>): <span class="type">JValue</span> = &#123;</span><br><span class="line">    putValueInBindings(bindings, <span class="string">"raw_data"</span>, data)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">val</span> script_output = engine.asInstanceOf[<span class="type">Invocable</span>].invokeFunction(<span class="string">"transform"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="type">JsonMethods</span>.parse(script_output.toString)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>For reference, the Javascript transform function is given next. ruleset
+contains the definition rules parsed from the YAML above. Both transform and
+ruleset are bound to the engine in a way similar to the input data:</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Javascript</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">transform</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">    <span class="keyword">var</span> transformed_data = &#123;&#125;;</span><br><span class="line">    <span class="keyword">var</span> input = <span class="built_in">JSON</span>.parse(raw_data);</span><br><span class="line">    <span class="keyword">for</span> (field <span class="keyword">in</span> ruleset) &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            transformed_data[field] = <span class="built_in">eval</span>(ruleset[field]);</span><br><span class="line">        &#125; <span class="keyword">catch</span>(err) &#123;</span><br><span class="line">            <span class="comment">// <span class="doctag">TODO:</span> error handling</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">JSON</span>.stringify(transformed_data);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>And thus we obtain a new record with as many fields as defined in the rules.</p>
+<h2 id="COLOPHON"><a href="#COLOPHON" class="headerlink" title="COLOPHON"></a>COLOPHON</h2><p>Using an embedded engine for a well-known language like Javascript has allowed
+us to provide the tools for frictionless migrations. Nashorn has delivered
+excellently in terms of performance as well as in terms of API. It gives you a
+lot of power in a very easy way.</p>
+<h2 id="REFERENCES"><a href="#REFERENCES" class="headerlink" title="REFERENCES"></a>REFERENCES</h2><h3 id="NASHORN"><a href="#NASHORN" class="headerlink" title="NASHORN"></a>NASHORN</h3><ul>
+<li><a href="http://openjdk.java.net/projects/nashorn/" target="_blank" rel="noopener">Home</a></li>
+<li><a href="https://blogs.oracle.com/nashorn/" target="_blank" rel="noopener">Blog</a></li>
+<li><a href="https://wiki.openjdk.java.net/display/Nashorn/Main" target="_blank" rel="noopener">Wiki</a></li>
+</ul>
+<h3 id="SCALA"><a href="#SCALA" class="headerlink" title="SCALA"></a>SCALA</h3><ul>
+<li><a href="http://www.scala-lang.org/" target="_blank" rel="noopener">Home</a></li>
+<li><a href="http://www.scala-lang.org/documentation/" target="_blank" rel="noopener">Doc</a></li>
+</ul>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://blog.yokiyoki.com/2017/11/30/Transform-data-on-the-fly-with-Java-Nashorn/" data-id="cjan21gg10000nsscf7gt52r2" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+    
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+
+  
+    
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/11/">November 2017</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2017/11/30/Transform-data-on-the-fly-with-Java-Nashorn/">Transform Data on the Fly With Java Nashorn</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2017 Julio Sangrador-Paton<br>
+      &copy; of the photos 2017 Witch Bandit<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+  </div>
+</body>
+</html>
